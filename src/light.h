@@ -1,9 +1,9 @@
 #ifndef LIGHT_H
 #define LIGHT_H
 
-#include <stdint.h>
 #include <QObject>
 #include <QThread>
+#include <QAtomicInteger>
 #include <QTimer>
 
 class Light : public QThread
@@ -26,11 +26,11 @@ public slots:
     void onClose();
 
 private:
-    const int mNormalBlink = 500;
-    const int mFastBlink = 100;
-    int mBlinkTime;
+    const int mNormalBlink = 600;
+    const int mFastBlink = 200;
+    QAtomicInteger<int> mBlinkTime;
     BlinkingState mBlinkingState;
-    QTimer timer;
+    QTimer mTimer;
 
     uint8_t on[2] = { 0xFF, 0xFF };
     uint8_t off[2] = { 0xFF, 0x00 };

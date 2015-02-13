@@ -14,8 +14,7 @@ public:
     ~Ruler();
 
 private:
-    int max = std::numeric_limits<int>::max();
-    std::array<int, 4> distances = {{ max }};
+    std::array<int, 5> distances = {{ std::numeric_limits<int>::max() }};
 
     void run() Q_DECL_OVERRIDE;
 

@@ -1,7 +1,9 @@
 #include "ruler.h"
 #include <wiringPi.h>
-#include <cstdio>
+#include <iostream>
 #include <cstdlib>
+#include <thread>
+#include <chrono>
 
 // GPIP23 = 4, GPIO24 = 5
 #define TRIG 4
@@ -16,7 +18,8 @@ Ruler::Ruler(QObject *parent)
 
     // TRIG pin must start LOW
     digitalWrite(TRIG, LOW);
-    delay(30);
+
+    QThread::msleep(200);
 }
 
 Ruler::~Ruler()
@@ -27,23 +30,25 @@ Ruler::~Ruler()
 
 void Ruler::run()
 {
-    printf("Ruler started\n");
+    std::cout << "Ruler started" << std::endl;
     while (true)
     {
         digitalWrite(TRIG, HIGH);
-        delayMicroseconds(20);
+        QThread::usleep(10);
         digitalWrite(TRIG, LOW);
 
         // Wait for echo start
         while (digitalRead(ECHO) == LOW);
+        auto startTime = std::chrono::steady_clock::now();
 
         // Wait for echo end
-        long startTime = micros();
         while (digitalRead(ECHO) == HIGH);
-        long travelTime = micros() - startTime;
+        auto travelTime = std::chrono::steady_clock::now() - startTime;
 
         // Get distance in centimeters
-        int distance = travelTime / 58;
+        int distance = std::chrono::duration_cast<std::chrono::microseconds>(travelTime).count() / 58;
+
+        //std::cout << "Measured: " << distance << "cm" << std::endl;
 
         const int size = distances.size();
         for (int i = 0; i < size; i++)
@@ -51,13 +56,15 @@ void Ruler::run()
 
         for (int i = 0; i < size; i++)
         {
-            if (i + 1 < size && distances[i + 1] > distances[i])
+            if (i + 1 < size && distances[i + 1] >= distances[i])
                 break;
             else if (i + 1 == size && distances[i] < distances[i - 1])
             {
+                std::cout << "Approximation detected!" << std::endl;
                 emit isClose(distance);
-                printf("Approximation detected!\n");
             }
         }
+
+        QThread::msleep(300);
     }
 }

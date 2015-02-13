@@ -1,9 +1,8 @@
 #include "light.h"
 #include <wiringPiSPI.h>
-#include <cstdio>
+#include <iostream>
+#include <cstring> // for std::strerror
 #include <cstdlib>
-#include <cerrno>
-#include <cstring>
 #include <thread>
 #include <chrono>
 
@@ -13,15 +12,17 @@ using namespace std;
 
 Light::Light(QObject *parent)
     : QThread(parent),
-    mBlinkingState(Off)
+    mBlinkTime(mNormalBlink),
+    mBlinkingState(On)
 {
     if (wiringPiSPISetup(CHANNEL, 1000000) < 0)
-        fprintf(stderr, "SPI setup failed %s\n", strerror(errno));
+        std::cout << "SPI setup failed: " << std::strerror(errno) << std::endl;
 
-    timer.setSingleShot(true);
-    timer.setInterval(10000);
-    connect(&timer, &QTimer::timeout, [=]() {
+    mTimer.setSingleShot(true);
+    mTimer.setInterval(10000);
+    connect(&mTimer, &QTimer::timeout, [=]() {
         mBlinkTime = mNormalBlink;
+        printf("Normal blink restored!\n");
     });
 }
 
@@ -33,21 +34,30 @@ Light::~Light()
 
 void Light::run()
 {
-    printf("Light started\n");
-    while (mBlinkingState == On)
+    std::cout << "Light started" << std::endl;
+    for(;;)
     {
-        memcpy(buf, on, 2);
-        wiringPiSPIDataRW(CHANNEL, buf, 2);
-        std::this_thread::sleep_for(std::chrono::milliseconds(mBlinkTime));
-        memcpy(buf, off, 2);
-        wiringPiSPIDataRW(CHANNEL, buf, 2);
-        std::this_thread::sleep_for(std::chrono::milliseconds(mBlinkTime));
+        if (mBlinkingState == On)
+        {
+            memcpy(buf, on, 2);
+            wiringPiSPIDataRW(CHANNEL, buf, 2);
+            QThread::msleep(mBlinkTime.load());
+            memcpy(buf, off, 2);
+            wiringPiSPIDataRW(CHANNEL, buf, 2);
+            QThread::msleep(mBlinkTime.load());
+        }
     }
 }
 
 void Light::onClose()
 {
-    mBlinkTime = mFastBlink;
+    int blinkTime = mBlinkTime.load();
+    if (blinkTime != mFastBlink)
+    {
+        std::cout << "Fast blink activated!" << std::endl;
+        mBlinkTime.store(mFastBlink);
+    }
+    mTimer.start();
 }
 
 void Light::setBlinkingState(BlinkingState state)
